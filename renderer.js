@@ -165,4 +165,11 @@ $(document).ready(() => {
             testI2C()
         }
     })
+
+    $( "button" ).on( "click", function() {
+        const parent = $(this).parent("td").parent("tr")
+        const addr = parent.find("td:eq(9)").html().trim()
+        const r = $(this).html().trim() == 'R'
+        console.log(addr, r)
+    })
 })

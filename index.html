@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8">
     <title>Hello World!</title>
+    <style>
+        input {
+            width: 20px;
+        }
+    </style>
   </head>
   <body>
     <p id="info"></p>
@@ -10,6 +15,84 @@
     <button id="close" value="get">close</button>
     <button id="test" value="get">Test CS</button>
     <button id="testi2c">Test I2C</button>
+    <table>
+        <tr>
+            <td>
+                REGISTER
+            </td>
+            <td>
+                B7
+            </td>
+            <td>
+                B6
+            </td>
+            <td>
+                B5
+            </td>
+            <td>
+                B4
+            </td>
+            <td>
+                B3
+            </td>
+            <td>
+                B2
+            </td>
+            <td>
+                B1
+            </td>
+            <td>
+                B0
+            </td>
+            <td>
+                REG ADR
+            </td>
+            <td>
+                POR STATE
+            </td>
+            <td>
+                R/W
+            </td>
+        </tr>
+        <tr>
+            <td>
+                Part ID
+            </td>
+            <td>
+                <input id="ff_7"/>
+            </td>
+            <td>
+                <input id="ff_6"/>
+            </td>
+            <td>
+                <input id="ff_5"/>
+            </td>
+            <td>
+                <input id="ff_4"/>
+            </td>
+            <td>
+                <input id="ff_3"/>
+            </td>
+            <td>
+                <input id="ff_2"/>
+            </td>
+            <td>
+                <input id="ff_1"/>
+            </td>
+            <td>
+                <input id="ff_0"/>
+            </td>
+            <td>
+                0xFF
+            </td>
+            <td>
+                <input id="FF_S" readonly/>
+            </td>
+            <td>
+                <button id="FF_R">R</button>
+            </td>
+        </tr>
+    </table>
     <script src="./renderer.js"></script>
   </body>
 </html>
