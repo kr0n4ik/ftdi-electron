@@ -61,6 +61,7 @@ class I2C {
 
     close() {
         if (this.#device) {
+            this.#device = null
             this.#device.close()
         }
     }
@@ -80,6 +81,7 @@ class I2C {
         }
         const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0) {
+            console.log(result)
             return false
         }
         return true
@@ -102,6 +104,7 @@ class I2C {
         }
         const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0 || (result[3] & 1) != 1) {
+            console.log(result)
             return null
         }
         return result[3] >> 1
@@ -113,16 +116,14 @@ class I2C {
         }
         this.#buf = []
         this.start()
-        this.writeByte((this.#addr << 1) | 0)
+        this.writeByte((this.#addr << 1) | 0) // w- 0
         this.writeByte(addr)
         this.start()
         this.writeByte((this.#addr << 1) | 1)
-        for (let i = 0; i < count; i++) {
-            this.readByte()  
-        }
+        this.readByte(4)
         this.stop()
         await this.#device.write(Uint8Array.from(this.#buf))
-        const result = await this.#device.read(63)
+        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         console.log(result)
     }
 
@@ -142,12 +143,12 @@ class I2C {
         this.#buf.push(0x13)
     }
 
-    async readByte() {
+    async readByte(count = 0) {
         this.#buf.push(0x80)
         this.#buf.push(0x00)
         this.#buf.push(0x11)
         this.#buf.push(0x24)
-        this.#buf.push(0x00)
+        this.#buf.push(count)
         this.#buf.push(0x00)
         this.#buf.push(0x22)
         this.#buf.push(0x00)
@@ -239,7 +240,7 @@ $(document).ready(() => {
             parent.find("td:eq(10)").find("input").val(val)
         } else {
             let val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)
-            console.log(val)
+            console.log(val, Number(addr))
             await i2c.writeRegister(Number(addr), val)
         }
     })
