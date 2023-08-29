@@ -8,168 +8,217 @@ const $ = require("jquery")
 0x22 MSB_RISING_EDGE_CLOCK_BIT_IN
 */
 
-let device = null
-let buf = []
+const registers = [
+    {
+        "title": "Mode configuration",
+        "addr": 0x09,
+        "set": 0x00,
+        "write": true
+    }
+]
 
-async function getData() {
-    const buf = []
-    for (let loop = 0; loop < 5; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x00)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x0b)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
+class I2C {
+    #device = null
+    #clock_divider = 0x00C8
+    #addr = 0xFF
+    #buf = []
+    constructor() {
+
     }
 
-    buf.push(0x11)
-    buf.push(0x00)
-    buf.push(0x00)
-    buf.push(0x80 | ((0x37 << 1) & 0x7E))
-    buf.push(0x24)
-    buf.push(0x00)
-    buf.push(0x00)
-
-    for (let loop = 0; loop < 5; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x08)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x0b)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
+    async open(addr) {
+        if (this.#device) {
+            return false
+        }
+        this.#device = await FTDI.openDevice("A")
+        if (!this.#device) {
+            return false
+        }
+        this.#device.resetDevice()
+        if (this.#device.status.rx_queue_bytes != 0) {
+            await this.#device.read(this.#device.status.rx_queue_bytes)
+        }
+        this.#device.setLatencyTimer(16)
+        this.#device.setUSBParameters(65535, 65535)
+        this.#device.setTimeouts(1000, 1000)
+        this.#device.setBitMode(0x00, FTDI.FT_BITMODE_RESET)
+        this.#device.setBitMode(0x00, FTDI.FT_BITMODE_MPSSE)
+        await this.#device.write(Uint8Array.from([0xAA]))
+        while (this.#device.status.rx_queue_bytes == 0) {
+        }
+        const response = await this.#device.read(this.#device.status.rx_queue_bytes)
+        if (response[0] != 0xFA || response[1] != 0xAA) {
+            console.log("Нет синхранизации с MPPSE")
+            return false
+        }
+        await this.#device.write(Uint8Array.from([0x8A, 0x97, 0x8C])) // spi 0x8D i2c 0x8C
+        await this.#device.write(Uint8Array.from([0x80, 0x03, 0x13, 0x86, (this.#clock_divider & 0xFF), ((this.#clock_divider >> 8) & 0xFF)]))
+        await this.#device.write(Uint8Array.from([0x85]))
+        this.#addr = addr
+        console.log("Синхранизации с MPPSE")
+        return true
     }
 
-    await device.write(Uint8Array.from(buf))
-    let response = await device.read(1)
-    console.log(response)
+    close() {
+        if (this.#device) {
+            this.#device.close()
+        }
+    }
+
+    async writeRegister(addr, val) {
+        if (!this.#device) {
+            return null
+        }
+        this.#buf = []
+        this.start()
+        this.writeByte((this.#addr << 1) | 0)
+        this.writeByte(addr)
+        this.writeByte(val)
+        this.stop()
+        await this.#device.write(Uint8Array.from(this.#buf))
+        while (this.#device.status.rx_queue_bytes < 3) {
+        }
+        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
+        if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0) {
+            return false
+        }
+        return true
+    }
+
+    async readRegister(addr) {
+        if (!this.#device) {
+            return null
+        }
+        this.#buf = []
+        this.start()
+        this.writeByte((this.#addr << 1) | 0)
+        this.writeByte(addr)
+        this.start()
+        this.writeByte((this.#addr << 1) | 1)
+        this.readByte()
+        this.stop()
+        await this.#device.write(Uint8Array.from(this.#buf))
+        while (this.#device.status.rx_queue_bytes < 5) {
+        }
+        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
+        if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0 || (result[3] & 1) != 1) {
+            return null
+        }
+        return result[3] >> 1
+    }
+
+    async writeByte(val) {
+        this.#buf.push(0x11)
+        this.#buf.push(0x00)
+        this.#buf.push(0x00)
+        this.#buf.push(val)
+        this.#buf.push(0x80)
+        this.#buf.push(0x00)
+        this.#buf.push(0x11)
+        this.#buf.push(0x22)
+        this.#buf.push(0x00)
+        this.#buf.push(0x87)
+        this.#buf.push(0x80)
+        this.#buf.push(0x02)
+        this.#buf.push(0x13)
+    }
+
+    async readByte() {
+        this.#buf.push(0x80)
+        this.#buf.push(0x00)
+        this.#buf.push(0x11)
+        this.#buf.push(0x24)
+        this.#buf.push(0x00)
+        this.#buf.push(0x00)
+        this.#buf.push(0x22)
+        this.#buf.push(0x00)
+        this.#buf.push(0x87)
+        this.#buf.push(0x80)
+        this.#buf.push(0x02)
+        this.#buf.push(0x13)
+    }
+
+    start() {
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x03)
+            this.#buf.push(0x13)
+        }
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x01)
+            this.#buf.push(0x13)
+        }
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x00)
+            this.#buf.push(0x13)
+        }
+    }
+
+    stop() {
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x00)
+            this.#buf.push(0x13)
+        }
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x01)
+            this.#buf.push(0x13)
+        }
+        for (let loop = 0; loop < 4; loop++) {
+            this.#buf.push(0x80)
+            this.#buf.push(0x03)
+            this.#buf.push(0x13)
+        }
+    }
 }
 
-function HighSpeedSetI2CStart() {
-    for (let loop = 0; loop < 4; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x03)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x13)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
-    }
-    for (let loop = 0; loop < 4; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x01)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x13)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
-    }
-    buf.push(0x80)   // команда GPIO для ADBUS
-    buf.push(0x00)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-    buf.push(0x13)   
-}
-
-function HighSpeedSetI2CStop() {
-    for (let loop = 0; loop < 4; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x01)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x13)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
-    }
-    for (let loop = 0; loop < 4; loop++) {
-        buf.push(0x80)   // команда GPIO для ADBUS
-        buf.push(0x03)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-        buf.push(0x13)   // bit3:CS, bit2:MISO, bit1:MOSI, bit0:SCLK
-    }
-    buf.push(0x80)   // команда GPIO для ADBUS
-    buf.push(0x00)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-    buf.push(0x10) 
-}
-
-async function SendByteAndCheckACK(val) {
-    buf.push(0x11)
-    buf.push(0x00)
-    buf.push(0x00)
-    buf.push(val)
-    buf.push(0x80)
-    buf.push(0x00)
-    buf.push(0x11)
-    buf.push(0x22)
-    buf.push(0x00)
-    buf.push(0x87)
-    await device.write(Uint8Array.from(buf))
-    buf = []
-    let response = await device.read(1)
-    if (!response || (response[0] & 0x01) != 0x00) {
-        return false
-    }
-    buf.push(0x80)
-    buf.push(0x02)
-    buf.push(0x13)
-}
-
-async function SendByteAndCheckNOACK() {
-    buf.push(0x80)
-    buf.push(0x00)
-    buf.push(0x11)
-    buf.push(0x24) //MSB_FALLING_EDGE_CLOCK_BYTE_IN
-    buf.push(0x00)
-    buf.push(0x00)
-    buf.push(0x22)
-    buf.push(0x00)
-    buf.push(0x87)
-    await device.write(Uint8Array.from(buf))
-    buf = []
-    let response = await device.read(2)
-    
-    console.log(response[0]>>1)
-    buf.push(0x80)   // команда GPIO для ADBUS
-    buf.push(0x02)   // перевод CS в лог. 1, MOSI и SCLK в лог. 0
-    buf.push(0x13) 
-}
+const i2c = new I2C()
 
 async function testI2C() {
-    //addr 0x68 0x69
-    //0x75
-    buf = []
-    HighSpeedSetI2CStart()
-    await SendByteAndCheckACK((0x68 << 1) | 0)
-    await SendByteAndCheckACK(0x75)
-    HighSpeedSetI2CStart()
-    await SendByteAndCheckACK((0x68 << 1) | 1)
-    await SendByteAndCheckNOACK()
-    HighSpeedSetI2CStop()
-    await device.write(Uint8Array.from(buf))
+    console.log(await i2c.readRegister(0xFE))
+    console.log(await i2c.readRegister(0xFF))
 }
+
+
+
 
 $(document).ready(() => {
     $("#init").click(async () => {
-        device = await FTDI.openDevice("A")
-        device.resetDevice()
-        device.setTimeouts(1000, 1000)
-        device.setBitMode(0x00, 0x00)
-        device.setBitMode(0x00, 0x02)
-        await device.write(Uint8Array.from([0xAA]))
-        for (let i = 0; i < 200; i++) {
-
+        if (i2c.open(0x57)) {
+            $("#info").html("Перешли в MPPSE")
         }
-        let response = await device.read(2)
-        if (!response || response[0] != 0xFA) {
-            $("#info").html("Ошибка перехода в MPPSE")
-            device.close()
-            return
-        }
-        const div = 0x0095
-        await device.write(Uint8Array.from([0x8A, 0x97, 0x8C])) // spi 0x8D i2c 0x8C 
-        await device.write(Uint8Array.from([0x80, 0x03, 0x13, 0x86, div & 0xFF, (div >> 8) & 0xFF]))
-        await device.write(Uint8Array.from([0x85]))
-        $("#info").html("Перешли в MPPSE")
     })
     $("#close").click(() => {
-        if (device) {
-            device.close()
+        if (i2c) {
+            i2c.close()
             $("#info").html("Зарыли соеденение")
         }
     })
-    $("#test").click(() => {
-        if (device) {
-            getData()
-        }
-    })
     $("#testi2c").click(() => {
-        if (device) {
-            testI2C()
-        }
+        testI2C()
     })
-
-    $( "button" ).on( "click", function() {
+    $("button.rw").on("click", async function () {
         const parent = $(this).parent("td").parent("tr")
         const addr = parent.find("td:eq(9)").html().trim()
         const r = $(this).html().trim() == 'R'
-        console.log(addr, r)
+        if (r) {
+            const val = await i2c.readRegister(Number(addr))
+            parent.find("td:eq(1)").find("input").val(((val & 1 << 7) != 0) ? 1 : 0)
+            parent.find("td:eq(2)").find("input").val(((val & 1 << 6) != 0) ? 1 : 0)
+            parent.find("td:eq(3)").find("input").val(((val & 1 << 5) != 0) ? 1 : 0)
+            parent.find("td:eq(4)").find("input").val(((val & 1 << 4) != 0) ? 1 : 0)
+            parent.find("td:eq(5)").find("input").val(((val & 1 << 3) != 0) ? 1 : 0)
+            parent.find("td:eq(6)").find("input").val(((val & 1 << 2) != 0) ? 1 : 0)
+            parent.find("td:eq(7)").find("input").val(((val & 1 << 1) != 0) ? 1 : 0)
+            parent.find("td:eq(8)").find("input").val(((val & 1 << 0) != 0) ? 1 : 0)
+            parent.find("td:eq(10)").find("input").val(val)
+        } else {
+            let val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)
+            console.log(val)
+            await i2c.writeRegister(Number(addr), val)
+        }
     })
 })
