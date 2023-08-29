@@ -107,6 +107,25 @@ class I2C {
         return result[3] >> 1
     }
 
+    async readFIFO(addr, count = 1) {
+        if (!this.#device) {
+            return null
+        }
+        this.#buf = []
+        this.start()
+        this.writeByte((this.#addr << 1) | 0)
+        this.writeByte(addr)
+        this.start()
+        this.writeByte((this.#addr << 1) | 1)
+        for (let i = 0; i < count; i++) {
+            this.readByte()  
+        }
+        this.stop()
+        await this.#device.write(Uint8Array.from(this.#buf))
+        const result = await this.#device.read(63)
+        console.log(result)
+    }
+
     async writeByte(val) {
         this.#buf.push(0x11)
         this.#buf.push(0x00)
@@ -196,6 +215,9 @@ $(document).ready(() => {
             i2c.close()
             $("#info").html("Зарыли соеденение")
         }
+    })
+    $("#test").click(() => {
+        i2c.readFIFO(0x07, 30)
     })
     $("#testi2c").click(() => {
         testI2C()
