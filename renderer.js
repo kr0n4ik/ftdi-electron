@@ -1,5 +1,6 @@
 const FTDI = require('ftdi-d2xx')
 const $ = require("jquery")
+const I2C = require("./lib/i2c")
 /*
 Памятка
 0х11 запись байта MSB_FALLING_EDGE_CLOCK_BYTE_OUT
@@ -7,6 +8,9 @@ const $ = require("jquery")
 0x24 чтение байта
 0x22 MSB_RISING_EDGE_CLOCK_BIT_IN
 */
+
+/*const MSB_RISING_EDGE_CLOCK_BYTE_IN = 0x20
+const MSB_FALLING_EDGE_CLOCK_BIT_OUT = 0x13
 
 class I2C {
     #device = null
@@ -40,6 +44,7 @@ class I2C {
         const response = await this.#device.read(this.#device.status.rx_queue_bytes)
         if (response[0] != 0xFA || response[1] != 0xAA) {
             console.log("Нет синхранизации с MPPSE")
+            this.close()
             return false
         }
         await this.#device.write(Uint8Array.from([0x8A, 0x97, 0x8C])) // spi 0x8D i2c 0x8C
@@ -105,6 +110,13 @@ class I2C {
         if (!this.#device) {
             return null
         }
+
+       // let wr = await this.readRegister(0x04)
+       // wr = await this.readRegister(0x04)
+       // const rd = await this.readRegister(0x06)
+       // console.log(wr, rd)
+       // await this.writeRegister(0x06, 0x00)
+//for (let i = 0; i < wr - rd; i++) {
         this.#buf = []
         this.start()
         this.writeByte((this.#addr << 1) | 0)
@@ -117,11 +129,15 @@ class I2C {
         this.readByte(false)
         this.readByte(false)
         this.readByte(false)
-        this.readByte(true)
+        this.readByte()
+        //this.readByte(true)
         this.stop()
         await this.#device.write(Uint8Array.from(this.#buf))
         const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         console.log(result)
+//}
+        //console.log(result[3], result[6], result[9])
+       // console.log(result[3], result[6], result[9])
     }
 
 
@@ -176,6 +192,18 @@ class I2C {
         this.#buf.push(0x03)
     }
 
+    readByte2(ask = false) {
+        ADbusVal = (byte)(0x00 | I2C_Data_SDAlo_SCLlo | (GPIO_Low_Dat & 0xF8));
+        ADbusDir = (byte)(0x00 | I2C_Dir_SDAin_SCLout | (GPIO_Low_Dir & 0xF8)); // make data input
+            MPSSEbuffer[NumBytesToSend++] = 0x80;                                   // command - set low byte
+            MPSSEbuffer[NumBytesToSend++] = ADbusVal;                               // Set the values
+            MPSSEbuffer[NumBytesToSend++] = ADbusDir;                               // Set the directions
+            // Clock one byte of data in from the sensor
+            MPSSEbuffer[NumBytesToSend++] = MSB_RISING_EDGE_CLOCK_BYTE_IN;      // Clock data byte in
+            MPSSEbuffer[NumBytesToSend++] = 0x00;
+            MPSSEbuffer[NumBytesToSend++] = 0x00; 
+    }
+
     start() {
         for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
@@ -211,7 +239,7 @@ class I2C {
             this.#buf.push(0x03)
         }
     }
-}
+}*/
 
 const i2c = new I2C()
 
