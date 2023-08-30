@@ -8,15 +8,6 @@ const $ = require("jquery")
 0x22 MSB_RISING_EDGE_CLOCK_BIT_IN
 */
 
-const registers = [
-    {
-        "title": "Mode configuration",
-        "addr": 0x09,
-        "set": 0x00,
-        "write": true
-    }
-]
-
 class I2C {
     #device = null
     #clock_divider = 0x00C8
@@ -61,8 +52,8 @@ class I2C {
 
     close() {
         if (this.#device) {
-            this.#device = null
             this.#device.close()
+            this.#device = null
         }
     }
 
@@ -100,7 +91,7 @@ class I2C {
         this.readByte()
         this.stop()
         await this.#device.write(Uint8Array.from(this.#buf))
-        while (this.#device.status.rx_queue_bytes < 5) {
+        while (this.#device.status.rx_queue_bytes < 4) {
         }
         const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0 || (result[3] & 1) != 1) {
@@ -116,94 +107,135 @@ class I2C {
         }
         this.#buf = []
         this.start()
-        this.writeByte((this.#addr << 1) | 0) // w- 0
+        this.writeByte((this.#addr << 1) | 0)
         this.writeByte(addr)
         this.start()
         this.writeByte((this.#addr << 1) | 1)
-        this.readByte(4)
+        this.readByte(false)
+        this.readByte(false)
+        this.readByte(false)
+        this.readByte(false)
+        this.readByte(false)
+        this.readByte(false)
+        this.readByte(true)
         this.stop()
         await this.#device.write(Uint8Array.from(this.#buf))
         const result = await this.#device.read(this.#device.status.rx_queue_bytes)
         console.log(result)
     }
 
-    async writeByte(val) {
+
+    writeByte(val) {
+        // записать 1 байт 0x11 L H byte1...
         this.#buf.push(0x11)
         this.#buf.push(0x00)
         this.#buf.push(0x00)
         this.#buf.push(val)
+
+        // установить 
         this.#buf.push(0x80)
         this.#buf.push(0x00)
-        this.#buf.push(0x11)
+        this.#buf.push(0x01)
+
         this.#buf.push(0x22)
         this.#buf.push(0x00)
+
         this.#buf.push(0x87)
+
         this.#buf.push(0x80)
         this.#buf.push(0x02)
-        this.#buf.push(0x13)
+        this.#buf.push(0x03)
     }
 
-    async readByte(count = 0) {
+    readByte(val = true) {
         this.#buf.push(0x80)
         this.#buf.push(0x00)
-        this.#buf.push(0x11)
+        this.#buf.push(0x01)
+
         this.#buf.push(0x24)
-        this.#buf.push(count)
         this.#buf.push(0x00)
-        this.#buf.push(0x22)
         this.#buf.push(0x00)
+
+        if (val) {
+            this.#buf.push(0x22)
+            this.#buf.push(0x00)
+        } else {
+            this.#buf.push(0x80)
+            this.#buf.push(0x02)
+            this.#buf.push(0x03)
+
+            this.#buf.push(0x13)
+            this.#buf.push(0x00) 
+            this.#buf.push(0x00) 
+        }
+
         this.#buf.push(0x87)
+
         this.#buf.push(0x80)
         this.#buf.push(0x02)
-        this.#buf.push(0x13)
+        this.#buf.push(0x03)
     }
 
     start() {
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x03)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x01)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x00)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
     }
 
     stop() {
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x00)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x01)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
-        for (let loop = 0; loop < 4; loop++) {
+        for (let loop = 0; loop < 40; loop++) {
             this.#buf.push(0x80)
             this.#buf.push(0x03)
-            this.#buf.push(0x13)
+            this.#buf.push(0x03)
         }
     }
 }
 
 const i2c = new I2C()
 
-async function testI2C() {
-    console.log(await i2c.readRegister(0xFE))
-    console.log(await i2c.readRegister(0xFF))
+function setByte(self) {
+    const parent = $(self).parent("td").parent("tr")
+    let byte = 0
+    for (let i = 0; i < 8; i++) {
+        byte |= ((parent.find("td:eq(" + (i + 1) + ")").find("input").val() || 0) << (7 - i))
+    }
+    parent.find("td:eq(10)").find("input").val(byte)
 }
 
-
-
+function setBit(self) {
+    const parent = $(self).parent("td").parent("tr")
+    const val = (parent.find("td:eq(10)").find("input").val() || 0x00)
+    parent.find("td:eq(1)").find("input").val(((val & 1 << 7) != 0) ? 1 : 0)
+    parent.find("td:eq(2)").find("input").val(((val & 1 << 6) != 0) ? 1 : 0)
+    parent.find("td:eq(3)").find("input").val(((val & 1 << 5) != 0) ? 1 : 0)
+    parent.find("td:eq(4)").find("input").val(((val & 1 << 4) != 0) ? 1 : 0)
+    parent.find("td:eq(5)").find("input").val(((val & 1 << 3) != 0) ? 1 : 0)
+    parent.find("td:eq(6)").find("input").val(((val & 1 << 2) != 0) ? 1 : 0)
+    parent.find("td:eq(7)").find("input").val(((val & 1 << 1) != 0) ? 1 : 0)
+    parent.find("td:eq(8)").find("input").val(((val & 1 << 0) != 0) ? 1 : 0)
+}
 
 $(document).ready(() => {
     $("#init").click(async () => {
@@ -229,19 +261,28 @@ $(document).ready(() => {
         const r = $(this).html().trim() == 'R'
         if (r) {
             const val = await i2c.readRegister(Number(addr))
-            parent.find("td:eq(1)").find("input").val(((val & 1 << 7) != 0) ? 1 : 0)
-            parent.find("td:eq(2)").find("input").val(((val & 1 << 6) != 0) ? 1 : 0)
-            parent.find("td:eq(3)").find("input").val(((val & 1 << 5) != 0) ? 1 : 0)
-            parent.find("td:eq(4)").find("input").val(((val & 1 << 4) != 0) ? 1 : 0)
-            parent.find("td:eq(5)").find("input").val(((val & 1 << 3) != 0) ? 1 : 0)
-            parent.find("td:eq(6)").find("input").val(((val & 1 << 2) != 0) ? 1 : 0)
-            parent.find("td:eq(7)").find("input").val(((val & 1 << 1) != 0) ? 1 : 0)
-            parent.find("td:eq(8)").find("input").val(((val & 1 << 0) != 0) ? 1 : 0)
             parent.find("td:eq(10)").find("input").val(val)
+            setBit(this)
         } else {
             let val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)
             console.log(val, Number(addr))
             await i2c.writeRegister(Number(addr), val)
+        }
+    })
+    $("input.byte").on("change", function() {
+        setBit(this)
+    })
+    $("input.byte").on("keyup", function(e) {
+        setBit(this)
+    })
+    $("input.bit").on("change", function() {
+        $(this).val($(this).val() == 1 ? 1 : 0)
+        setByte(this)
+    })
+    $("input.bit").on("keyup", function(e) {
+        if (e.keyCode != 8) {
+            $(this).val($(this).val() == 1 ? 1 : 0)
+            setByte(this)
         }
     })
 })
