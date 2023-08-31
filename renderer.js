@@ -244,25 +244,58 @@ class I2C {
 const i2c = new I2C()
 let x = 0
 let st = false
+let n = 0
+let avr = 0
+let sr = 0
 
 let timerId = setInterval(async () => {
     const canvas = document.getElementById("canvas")
     const ctx = document.getElementById("canvas").getContext("2d")
     ctx.fillStyle = "#ff2626"
     if (i2c && st) {
-        const y = await i2c.readFIFO(0x07, 60)
+        const rd = await i2c.readRegister(0x06)
+        const wr = await i2c.readRegister(0x04)
+        const count = (wr - rd) & 31
+       // console.log(count)
+        if (count > 0) {
+            const result = await i2c.readRegister(0x07, 6 * count)
+            for(let i = 0; i < count; i++) {
+                let red = (result[1 + i*6] << 8) | (result[2 + i*6] << 0);
+                let ir = (result[4 + i*6] << 8) | (result[5 + i*6] << 0);
+                ctx.fillStyle = "#ff2626"
+                ctx.beginPath()
+                ctx.arc(x, red / 100, 1, 0, Math.PI * 2, true)
+                ctx.fill()
+                ctx.fillStyle = "#26ff26"
+                ctx.beginPath()
+                ctx.arc(x, ir / 100, 1, 0, Math.PI * 2, true)
+                ctx.fill()
+                if (x++ > 700) {
+                    x = 0
+                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+                }
+            }
+        }
+        /*const y = await i2c.readFIFO(0x07, 60)
         if (y) {
+            n++
+            avr += y
+            if (n > 100) {
+                sr = avr / n
+                n = 0;
+                avr = 0
+            }
             ctx.beginPath()
-            ctx.arc(x, y / 100, 2, 0, Math.PI * 2, true)
+            ctx.arc(x, y/ 5, 1, 0, Math.PI * 2, true)
             ctx.fill()
             if (x++ > 700) {
                 x = 0
                 ctx.clearRect(0, 0, canvas.width, canvas.height)
             }
-        }
+        }*/
     }
     
-}, 50)
+}, 150)
 
 
 
@@ -304,7 +337,20 @@ $(document).ready(() => {
         i2c.readFIFO(0x07, 30)
     })
     $("#test2").click(() => {
-        i2c.test()
+        i2c.readRegister(0x0c, 2)
+    })
+    $("#def").click(async () => {
+        await i2c.writeRegister(0x02, 0xC0)
+        await i2c.writeRegister(0x03, 0x00)
+        await i2c.writeRegister(0x04, 0x00)
+        await i2c.writeRegister(0x05, 0x00)
+        await i2c.writeRegister(0x06, 0x00)
+        await i2c.writeRegister(0x08, 0x1f)
+        await i2c.writeRegister(0x09, 0x03)
+        await i2c.writeRegister(0x0A, 0x27)
+        await i2c.writeRegister(0x0C, 0x24)
+        await i2c.writeRegister(0x0D, 0x24)
+        await i2c.writeRegister(0x10, 0x7f)
     })
     $("#testi2c").click(() => {
         if (st) {
@@ -319,7 +365,7 @@ $(document).ready(() => {
         const r = $(this).html().trim() == 'R'
         if (r) {
             const val = await i2c.readRegister(Number(addr))
-            parent.find("td:eq(10)").find("input").val(val)
+            parent.find("td:eq(10)").find("input").val(val[0])
             setBit(this)
         } else {
             let val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)

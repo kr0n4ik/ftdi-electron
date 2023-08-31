@@ -16,6 +16,7 @@
     <button id="test">Test fifo</button>
     <button id="testi2c">Test I2C</button>
     <button id="test2">Test 2</button>
+    <button id="def">Default</button>
     <table id="registers">
         <tr><td>FIFO Write Pointer</td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td>0x00</td><td><input type="text" class="byte"/></td><td><button class="rw">R</button><button class="rw">W</button></td></tr>
         <tr><td>FIFO Write Pointer</td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td>0x01</td><td><input type="text" class="byte"/></td><td><button class="rw">R</button><button class="rw">W</button></td></tr>
@@ -34,7 +35,7 @@
         <tr><td>Multi-LED2</td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit" disabled/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td><input type="text" class="bit"/></td><td>0x12</td><td><input type="text" class="byte"/></td><td><button class="rw">R</button><button class="rw">W</button></td></tr>
         <tr><td>Part ID</td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td><input type="text" class="bit" readonly/></td><td>0xFF</td><td><input type="text" class="byte" readonly/></td><td><button class="rw">R</button></td></tr>
     </table>
-    <canvas height="700px" width="700px" id="canvas"></canvas>
+    <canvas height="7000px" width="700px" id="canvas"></canvas>
     <script src="./renderer.js"></script>
   </body>
 </html>
