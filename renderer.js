@@ -242,6 +242,29 @@ class I2C {
 }*/
 
 const i2c = new I2C()
+let x = 0
+let st = false
+
+let timerId = setInterval(async () => {
+    const canvas = document.getElementById("canvas")
+    const ctx = document.getElementById("canvas").getContext("2d")
+    ctx.fillStyle = "#ff2626"
+    if (i2c && st) {
+        const y = await i2c.readFIFO(0x07, 60)
+        if (y) {
+            ctx.beginPath()
+            ctx.arc(x, y / 100, 2, 0, Math.PI * 2, true)
+            ctx.fill()
+            if (x++ > 700) {
+                x = 0
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+            }
+        }
+    }
+    
+}, 50)
+
+
 
 function setByte(self) {
     const parent = $(self).parent("td").parent("tr")
@@ -280,8 +303,15 @@ $(document).ready(() => {
     $("#test").click(() => {
         i2c.readFIFO(0x07, 30)
     })
+    $("#test2").click(() => {
+        i2c.test()
+    })
     $("#testi2c").click(() => {
-        testI2C()
+        if (st) {
+            st = false
+        } else {
+            st = true
+        }
     })
     $("button.rw").on("click", async function () {
         const parent = $(this).parent("td").parent("tr")
