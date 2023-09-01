@@ -9,7 +9,6 @@ let red_avr = 0
 let red_n = 0
 let red_sr = 0
 let ir_avr = 0
-let ir_n = 0
 let ir_sr = 0
 
 setInterval(async () => {
@@ -48,8 +47,6 @@ setInterval(async () => {
         }
     }  
 }, 200)
-
-
 
 function setByte(self) {
     const parent = $(self).parent("td").parent("tr")
