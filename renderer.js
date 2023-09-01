@@ -1,6 +1,6 @@
 const FTDI = require('ftdi-d2xx')
 const $ = require("jquery")
-const I2C = require("./lib/i2c")
+const I2C = require("ftdi-i2c")
 
 const i2c = new I2C()
 let x = 0
