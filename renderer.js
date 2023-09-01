@@ -1,301 +1,53 @@
 const FTDI = require('ftdi-d2xx')
 const $ = require("jquery")
 const I2C = require("./lib/i2c")
-/*
-Памятка
-0х11 запись байта MSB_FALLING_EDGE_CLOCK_BYTE_OUT
-0х13 запись бита
-0x24 чтение байта
-0x22 MSB_RISING_EDGE_CLOCK_BIT_IN
-*/
-
-/*const MSB_RISING_EDGE_CLOCK_BYTE_IN = 0x20
-const MSB_FALLING_EDGE_CLOCK_BIT_OUT = 0x13
-
-class I2C {
-    #device = null
-    #clock_divider = 0x00C8
-    #addr = 0xFF
-    #buf = []
-    constructor() {
-
-    }
-
-    async open(addr) {
-        if (this.#device) {
-            return false
-        }
-        this.#device = await FTDI.openDevice("A")
-        if (!this.#device) {
-            return false
-        }
-        this.#device.resetDevice()
-        if (this.#device.status.rx_queue_bytes != 0) {
-            await this.#device.read(this.#device.status.rx_queue_bytes)
-        }
-        this.#device.setLatencyTimer(16)
-        this.#device.setUSBParameters(65535, 65535)
-        this.#device.setTimeouts(1000, 1000)
-        this.#device.setBitMode(0x00, FTDI.FT_BITMODE_RESET)
-        this.#device.setBitMode(0x00, FTDI.FT_BITMODE_MPSSE)
-        await this.#device.write(Uint8Array.from([0xAA]))
-        while (this.#device.status.rx_queue_bytes == 0) {
-        }
-        const response = await this.#device.read(this.#device.status.rx_queue_bytes)
-        if (response[0] != 0xFA || response[1] != 0xAA) {
-            console.log("Нет синхранизации с MPPSE")
-            this.close()
-            return false
-        }
-        await this.#device.write(Uint8Array.from([0x8A, 0x97, 0x8C])) // spi 0x8D i2c 0x8C
-        await this.#device.write(Uint8Array.from([0x80, 0x03, 0x13, 0x86, (this.#clock_divider & 0xFF), ((this.#clock_divider >> 8) & 0xFF)]))
-        await this.#device.write(Uint8Array.from([0x85]))
-        this.#addr = addr
-        console.log("Синхранизации с MPPSE")
-        return true
-    }
-
-    close() {
-        if (this.#device) {
-            this.#device.close()
-            this.#device = null
-        }
-    }
-
-    async writeRegister(addr, val) {
-        if (!this.#device) {
-            return null
-        }
-        this.#buf = []
-        this.start()
-        this.writeByte((this.#addr << 1) | 0)
-        this.writeByte(addr)
-        this.writeByte(val)
-        this.stop()
-        await this.#device.write(Uint8Array.from(this.#buf))
-        while (this.#device.status.rx_queue_bytes < 3) {
-        }
-        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
-        if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0) {
-            console.log(result)
-            return false
-        }
-        return true
-    }
-
-    async readRegister(addr) {
-        if (!this.#device) {
-            return null
-        }
-        this.#buf = []
-        this.start()
-        this.writeByte((this.#addr << 1) | 0)
-        this.writeByte(addr)
-        this.start()
-        this.writeByte((this.#addr << 1) | 1)
-        this.readByte()
-        this.stop()
-        await this.#device.write(Uint8Array.from(this.#buf))
-        while (this.#device.status.rx_queue_bytes < 4) {
-        }
-        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
-        if ((result[0] & 1) != 0 || (result[1] & 1) != 0 || (result[2] & 1) != 0 || (result[3] & 1) != 1) {
-            console.log(result)
-            return null
-        }
-        return result[3] >> 1
-    }
-
-    async readFIFO(addr, count = 1) {
-        if (!this.#device) {
-            return null
-        }
-
-       // let wr = await this.readRegister(0x04)
-       // wr = await this.readRegister(0x04)
-       // const rd = await this.readRegister(0x06)
-       // console.log(wr, rd)
-       // await this.writeRegister(0x06, 0x00)
-//for (let i = 0; i < wr - rd; i++) {
-        this.#buf = []
-        this.start()
-        this.writeByte((this.#addr << 1) | 0)
-        this.writeByte(addr)
-        this.start()
-        this.writeByte((this.#addr << 1) | 1)
-        this.readByte(false)
-        this.readByte(false)
-        this.readByte(false)
-        this.readByte(false)
-        this.readByte(false)
-        this.readByte(false)
-        this.readByte()
-        //this.readByte(true)
-        this.stop()
-        await this.#device.write(Uint8Array.from(this.#buf))
-        const result = await this.#device.read(this.#device.status.rx_queue_bytes)
-        console.log(result)
-//}
-        //console.log(result[3], result[6], result[9])
-       // console.log(result[3], result[6], result[9])
-    }
-
-
-    writeByte(val) {
-        // записать 1 байт 0x11 L H byte1...
-        this.#buf.push(0x11)
-        this.#buf.push(0x00)
-        this.#buf.push(0x00)
-        this.#buf.push(val)
-
-        // установить 
-        this.#buf.push(0x80)
-        this.#buf.push(0x00)
-        this.#buf.push(0x01)
-
-        this.#buf.push(0x22)
-        this.#buf.push(0x00)
-
-        this.#buf.push(0x87)
-
-        this.#buf.push(0x80)
-        this.#buf.push(0x02)
-        this.#buf.push(0x03)
-    }
-
-    readByte(val = true) {
-        this.#buf.push(0x80)
-        this.#buf.push(0x00)
-        this.#buf.push(0x01)
-
-        this.#buf.push(0x24)
-        this.#buf.push(0x00)
-        this.#buf.push(0x00)
-
-        if (val) {
-            this.#buf.push(0x22)
-            this.#buf.push(0x00)
-        } else {
-            this.#buf.push(0x80)
-            this.#buf.push(0x02)
-            this.#buf.push(0x03)
-
-            this.#buf.push(0x13)
-            this.#buf.push(0x00) 
-            this.#buf.push(0x00) 
-        }
-
-        this.#buf.push(0x87)
-
-        this.#buf.push(0x80)
-        this.#buf.push(0x02)
-        this.#buf.push(0x03)
-    }
-
-    readByte2(ask = false) {
-        ADbusVal = (byte)(0x00 | I2C_Data_SDAlo_SCLlo | (GPIO_Low_Dat & 0xF8));
-        ADbusDir = (byte)(0x00 | I2C_Dir_SDAin_SCLout | (GPIO_Low_Dir & 0xF8)); // make data input
-            MPSSEbuffer[NumBytesToSend++] = 0x80;                                   // command - set low byte
-            MPSSEbuffer[NumBytesToSend++] = ADbusVal;                               // Set the values
-            MPSSEbuffer[NumBytesToSend++] = ADbusDir;                               // Set the directions
-            // Clock one byte of data in from the sensor
-            MPSSEbuffer[NumBytesToSend++] = MSB_RISING_EDGE_CLOCK_BYTE_IN;      // Clock data byte in
-            MPSSEbuffer[NumBytesToSend++] = 0x00;
-            MPSSEbuffer[NumBytesToSend++] = 0x00; 
-    }
-
-    start() {
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x03)
-            this.#buf.push(0x03)
-        }
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x01)
-            this.#buf.push(0x03)
-        }
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x00)
-            this.#buf.push(0x03)
-        }
-    }
-
-    stop() {
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x00)
-            this.#buf.push(0x03)
-        }
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x01)
-            this.#buf.push(0x03)
-        }
-        for (let loop = 0; loop < 40; loop++) {
-            this.#buf.push(0x80)
-            this.#buf.push(0x03)
-            this.#buf.push(0x03)
-        }
-    }
-}*/
 
 const i2c = new I2C()
 let x = 0
-let st = false
-let n = 0
-let avr = 0
-let sr = 0
+let run = false
+let red_avr = 0
+let red_n = 0
+let red_sr = 0
+let ir_avr = 0
+let ir_n = 0
+let ir_sr = 0
 
-let timerId = setInterval(async () => {
+setInterval(async () => {
     const canvas = document.getElementById("canvas")
     const ctx = document.getElementById("canvas").getContext("2d")
-    ctx.fillStyle = "#ff2626"
-    if (i2c && st) {
+    if (i2c && run) {
         const rd = await i2c.readRegister(0x06)
         const wr = await i2c.readRegister(0x04)
         const count = (wr - rd) & 31
-       // console.log(count)
         if (count > 0) {
             const result = await i2c.readRegister(0x07, 6 * count)
             for(let i = 0; i < count; i++) {
-                let red = (result[1 + i*6] << 8) | (result[2 + i*6] << 0);
-                let ir = (result[4 + i*6] << 8) | (result[5 + i*6] << 0);
+                let red = (result[i*6] << 16) | (result[1 + i*6] << 8) | (result[2 + i*6] << 0)
+                let ir = (result[3 + i*6] << 16) |(result[4 + i*6] << 8) | (result[5 + i*6] << 0)
+                red_avr += red
+                ir_avr += ir
+                red_n++
                 ctx.fillStyle = "#ff2626"
                 ctx.beginPath()
-                ctx.arc(x, red / 100, 1, 0, Math.PI * 2, true)
+                ctx.arc(x, (red - red_sr) / 50 + canvas.height / 2, 1, 0, Math.PI * 2, true)
                 ctx.fill()
                 ctx.fillStyle = "#26ff26"
                 ctx.beginPath()
-                ctx.arc(x, ir / 100, 1, 0, Math.PI * 2, true)
+                ctx.arc(x, (ir - ir_sr) / 50 + canvas.height / 2, 1, 0, Math.PI * 2, true)
                 ctx.fill()
-                if (x++ > 700) {
+                if (x++ > canvas.width) {
+                    red_sr = red_avr / red_n
+                    ir_sr = ir_avr / red_n
+                    red_avr = 0
+                    red_n = 0
+                    ir_avr = 0
                     x = 0
                     ctx.clearRect(0, 0, canvas.width, canvas.height)
                 }
             }
         }
-        /*const y = await i2c.readFIFO(0x07, 60)
-        if (y) {
-            n++
-            avr += y
-            if (n > 100) {
-                sr = avr / n
-                n = 0;
-                avr = 0
-            }
-            ctx.beginPath()
-            ctx.arc(x, y/ 5, 1, 0, Math.PI * 2, true)
-            ctx.fill()
-            if (x++ > 700) {
-                x = 0
-                ctx.clearRect(0, 0, canvas.width, canvas.height)
-            }
-        }*/
-    }
-    
-}, 150)
+    }  
+}, 200)
 
 
 
@@ -322,24 +74,22 @@ function setBit(self) {
 }
 
 $(document).ready(() => {
-    $("#init").click(async () => {
-        if (i2c.open(0x57)) {
-            $("#info").html("Перешли в MPPSE")
+    $("#open").click(async function() {
+        const is_open = $(this).html() == "OPEN"
+        if (is_open) {
+            if (await i2c.open(0x57)) {
+                $(this).html("CLOSE")
+            }
+        } else {
+            if (await i2c.close()) {
+                $(this).html("OPEN")
+            }
         }
-    })
-    $("#close").click(() => {
-        if (i2c) {
-            i2c.close()
-            $("#info").html("Зарыли соеденение")
-        }
-    })
-    $("#test").click(() => {
-        i2c.readFIFO(0x07, 30)
-    })
-    $("#test2").click(() => {
-        i2c.readRegister(0x0c, 2)
+        
     })
     $("#def").click(async () => {
+        run = false
+        $("#run").html("RUN")
         await i2c.writeRegister(0x02, 0xC0)
         await i2c.writeRegister(0x03, 0x00)
         await i2c.writeRegister(0x04, 0x00)
@@ -352,24 +102,27 @@ $(document).ready(() => {
         await i2c.writeRegister(0x0D, 0x24)
         await i2c.writeRegister(0x10, 0x7f)
     })
-    $("#testi2c").click(() => {
-        if (st) {
-            st = false
+    $("#run").click(function() {
+        if (run) {
+            run = false
+            $(this).html("RUN")
         } else {
-            st = true
+            run = true
+            $(this).html("STOP")
         }
     })
     $("button.rw").on("click", async function () {
+        run = false
+        $("#run").html("RUN")
         const parent = $(this).parent("td").parent("tr")
         const addr = parent.find("td:eq(9)").html().trim()
-        const r = $(this).html().trim() == 'R'
-        if (r) {
+        const is_r = $(this).html().trim() == 'R'
+        if (is_r) {
             const val = await i2c.readRegister(Number(addr))
             parent.find("td:eq(10)").find("input").val(val[0])
             setBit(this)
         } else {
-            let val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)
-            console.log(val, Number(addr))
+            const val = Number(parent.find("td:eq(10)").find("input").val() || 0x00)
             await i2c.writeRegister(Number(addr), val)
         }
     })
