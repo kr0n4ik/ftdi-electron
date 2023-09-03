@@ -1,4 +1,3 @@
-const FTDI = require('ftdi-d2xx')
 const $ = require("jquery")
 const I2C = require("ftdi-i2c")
 
@@ -11,11 +10,16 @@ let red_sr = 0
 let ir_avr = 0
 let ir_sr = 0
 
+/**
+ * Опрос датчика MAX3102 и вычитание постоянной составляющей
+ */
 setInterval(async () => {
     const canvas = document.getElementById("canvas")
     const ctx = document.getElementById("canvas").getContext("2d")
     if (i2c && run) {
+        // количество байт, которые прочитали
         const rd = await i2c.readRegister(0x06)
+        // количество байт, которые успели записаться в буфер
         const wr = await i2c.readRegister(0x04)
         const count = (wr - rd) & 31
         if (count > 0) {
@@ -27,9 +31,11 @@ setInterval(async () => {
                 ir_avr += ir
                 red_n++
                 ctx.fillStyle = "#ff2626"
+                // вывод зеленых точек, канал IR
                 ctx.beginPath()
                 ctx.arc(x, (red - red_sr) / 50 + canvas.height / 2, 1, 0, Math.PI * 2, true)
                 ctx.fill()
+                // вывод красных точек, канал RED
                 ctx.fillStyle = "#26ff26"
                 ctx.beginPath()
                 ctx.arc(x, (ir - ir_sr) / 50 + canvas.height / 2, 1, 0, Math.PI * 2, true)
@@ -48,6 +54,9 @@ setInterval(async () => {
     }  
 }, 200)
 
+/**
+ * Перевод битов в байт
+ */
 function setByte(self) {
     const parent = $(self).parent("td").parent("tr")
     let byte = 0
@@ -57,6 +66,9 @@ function setByte(self) {
     parent.find("td:eq(10)").find("input").val(byte)
 }
 
+/**
+ * Перевод байта в биты
+ */
 function setBit(self) {
     const parent = $(self).parent("td").parent("tr")
     const val = (parent.find("td:eq(10)").find("input").val() || 0x00)
@@ -84,6 +96,9 @@ $(document).ready(() => {
         }
         
     })
+    /**
+     * Установка занчений как пример
+     */
     $("#def").click(async () => {
         run = false
         $("#run").html("RUN")
@@ -99,6 +114,9 @@ $(document).ready(() => {
         await i2c.writeRegister(0x0D, 0x24)
         await i2c.writeRegister(0x10, 0x7f)
     })
+    /**
+     * запуск чтения из буфера
+     */
     $("#run").click(function() {
         if (run) {
             run = false
@@ -108,6 +126,10 @@ $(document).ready(() => {
             $(this).html("STOP")
         }
     })
+
+    /**
+     * запись и чтение данных в/из регистр(а)
+     */
     $("button.rw").on("click", async function () {
         run = false
         $("#run").html("RUN")
